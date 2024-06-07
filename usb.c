@@ -203,8 +203,13 @@ int qdl_read(struct qdl_device *qdl, void *buf, size_t len, unsigned int timeout
 	int ret;
 
 	ret = libusb_bulk_transfer(qdl->usb_handle, qdl->in_ep, buf, len, &actual, timeout);
-	if (ret < 0)
-		return -1;
+	if ((ret != 0 && ret != LIBUSB_ERROR_TIMEOUT) ||
+		(ret == LIBUSB_ERROR_TIMEOUT && actual == 0)){
+			return -1;
+		}
+	else if (ret != 0){
+		warnx("bulk read failed: %s", libusb_strerror(ret));
+	}
 
 	return actual;
 }
@@ -222,8 +227,9 @@ int qdl_write(struct qdl_device *qdl, const void *buf, size_t len)
 		xfer = (len > qdl->out_maxpktsize) ? qdl->out_maxpktsize : len;
 
 		ret = libusb_bulk_transfer(qdl->usb_handle, qdl->out_ep, data,
-					   xfer, &actual, 1000);
-		if (ret < 0) {
+					   xfer, &actual, 2000);
+		if ((ret != 0 && ret != LIBUSB_ERROR_TIMEOUT) ||
+			(ret == LIBUSB_ERROR_TIMEOUT && actual == 0)) {
 			warnx("bulk write failed: %s", libusb_strerror(ret));
 			return -1;
 		}
@@ -235,7 +241,7 @@ int qdl_write(struct qdl_device *qdl, const void *buf, size_t len)
 
 	if (len_orig % qdl->out_maxpktsize == 0) {
 		ret = libusb_bulk_transfer(qdl->usb_handle, qdl->out_ep, NULL,
-					   0, &actual, 1000);
+					   0, &actual, 2000);
 		if (ret < 0)
 			return -1;
 	}
